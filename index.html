@@ -1,0 +1,82 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<title>World Cup</title>
+	<script src="js/jquery.js"></script>
+	<style>
+	#template{
+			display: none;
+	}
+	</style>
+	<script type="text/javascript" src="js/underscore-min.js"></script>
+	<script type="text/javascript" src="js/backbone-min.js"></script>
+</head>
+<body>
+	<h1>Hello World</h1>
+	<ul id="container"></ul>
+	<div id="template"><ul><li></li></ul></div>
+	<script>
+	(function($){
+	var Student=Backbone.Model.extend({
+		initialize: function(){
+			this.on('all', function(e){console.log("event: "+e)});
+		},
+		defaults: {
+			'id': 'underfind',
+			'nickname': 'underfind',
+			'age': 'underfind'
+		},
+		urlRoot: "mysql.php?zone=json",
+		url: function(){
+			var base=this.urlRoot || (this.collection && this.collection.url) || "/";
+			if (this.isNew()) return base;
+			return base;
+		}
+	});
+	var Students=Backbone.Collection.extend({
+		model: Student
+	});
+	var Add=Backbone.Model.extend({
+		initialize: function(){
+			this.on('all', function(e){console.log("event: "+e)});
+		},
+		defaults: {
+			'id': 'underfind',
+			'nickname': 'underfind',
+			'age': 'underfind'
+		},
+		urlRoot: "mysql.php?zone=add",
+		url: function(){
+			var base=this.urlRoot || (this.collection && this.collection.url) || "/";
+			if (this.isNew()) return base;
+			return base;
+		}
+	});
+	var add=new Add({'id':'4', 'nickname':'Frank', 'age':'15'});
+	add.save();
+	var View=Backbone.View.extend({
+		initialize: function(){
+			this.render();
+		},
+		el: '#container',
+		events: {},
+		template: $('#template').children(),
+		render: function(){
+			that=this;
+			var html=null;
+			this.model.fetch({
+				success: function(collection, response){
+					for(var i in response){
+						html=that.template.clone().find('li');
+						html=html.text(response[i]['id']+': '+response[i]['nickname']+'('+response[i]['age']+')');
+						$('#container').append(html);
+					}
+				}
+			});
+	    }
+	});
+	var students=new Students, view=new View({model: students});
+	})(jQuery);
+   </script>
+</body>
+</html>
