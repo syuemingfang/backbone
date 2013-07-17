@@ -1,81 +1,132 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-	<title>World Cup</title>
-	<script src="js/jquery.js"></script>
+	<title>Hello World</title>
+	<script src='js/jquery.js'></script>
 	<style>
 	#template{
 			display: none;
 	}
 	</style>
-	<script type="text/javascript" src="js/underscore-min.js"></script>
-	<script type="text/javascript" src="js/backbone-min.js"></script>
+	<script type='text/javascript' src='js/underscore-min.js'></script>
+	<script type='text/javascript' src='js/backbone-min.js'></script>
 </head>
 <body>
 	<h1>Hello World</h1>
-	<ul id="container"></ul>
-	<div id="template"><ul><li></li></ul></div>
+	<div id='wrapper'>
+	<input type='button' id='readPage' value='Read' /> <input type='button' id='createPage' value='Create' />
+	<h2>View Data</h2>
+	<ul id='container-read'></ul>
+	</div>
+	<div id='template'>
+		<ul class="list-read"><li></li></ul>
+		<form id='form-create'>
+			<h2>Create Data</h2>
+			nickname: <input type='text' name='nickname' id='nickname' value='Joe' />
+			age: <input type='text' name='age' id='age' value='20' />
+			<input type='button' name='create' id='create' value='Create' />
+		</form>
+		<form id='form-update'>
+			<h2>Update Data</h2>
+			<input type='hidden' name='id' id='id' value='' />
+			nickname: <input type='text' name='nickname' id='nickname' value='Joe' />
+			age: <input type='text' name='age' id='age' value='20' />
+			<input type='button' name='update' id='update' value='Update' />
+		</form>
+	</div>
 	<script>
 	(function($){
+	jQuery.fn.serializeObject=function() {
+		var arrayData, objectData;
+		arrayData=this.serializeArray();
+		objectData={};
+		$.each(arrayData, function(){
+			var value;
+			if(this.value != null){
+				value=this.value;
+			} else{
+				value='';
+			}
+			if(objectData[this.name] != null) {
+				if(!objectData[this.name].push) {
+					objectData[this.name]=[objectData[this.name]];
+				}
+				objectData[this.name].push(value);
+			} else {
+				objectData[this.name]=value;
+			}
+		});
+		return objectData;
+	};
 	var Student=Backbone.Model.extend({
 		initialize: function(){
-			this.on('all', function(e){console.log("event: "+e)});
+			this.on('all', function(e){console.log('event: '+e)});
 		},
 		defaults: {
 			'id': 'underfind',
 			'nickname': 'underfind',
 			'age': 'underfind'
 		},
-		urlRoot: "mysql.php?zone=json",
+		urlRoot: 'mysql.php',
 		url: function(){
-			var base=this.urlRoot || (this.collection && this.collection.url) || "/";
+			var base=this.urlRoot || (this.collection && this.collection.url) || '/';
 			if (this.isNew()) return base;
-			return base;
+			return base+'?zone='+this.attributes.zone;
 		}
 	});
-	var Students=Backbone.Collection.extend({
-		model: Student
-	});
-	var Add=Backbone.Model.extend({
-		initialize: function(){
-			this.on('all', function(e){console.log("event: "+e)});
-		},
-		defaults: {
-			'id': 'underfind',
-			'nickname': 'underfind',
-			'age': 'underfind'
-		},
-		urlRoot: "mysql.php?zone=add",
-		url: function(){
-			var base=this.urlRoot || (this.collection && this.collection.url) || "/";
-			if (this.isNew()) return base;
-			return base;
-		}
-	});
-	var add=new Add({'id':'4', 'nickname':'Frank', 'age':'15'});
-	add.save();
 	var View=Backbone.View.extend({
 		initialize: function(){
 			this.render();
 		},
-		el: '#container',
-		events: {},
-		template: $('#template').children(),
+		el: '#wrapper',
+		events: {
+			
+			'click #createPage':'submitForm',
+			'click #create':'submitForm',
+			'click .update':'updateForm',
+			'click .delete':'deleteForm'
+		},
+		template: $('#template'),
 		render: function(){
-			that=this;
-			var html=null;
+			var self=this, html=null;
+			this.$el.find('#container-read').html('');
+			this.model.set({zone:'read'});
 			this.model.fetch({
 				success: function(collection, response){
 					for(var i in response){
-						html=that.template.clone().find('li');
-						html=html.text(response[i]['id']+': '+response[i]['nickname']+'('+response[i]['age']+')');
-						$('#container').append(html);
+						html=self.template.clone().find('.list-read li');
+						html=html.html(response[i]['id']+': '+response[i]['nickname']+'('+response[i]['age']+') <input type="button" class="update" value="Edit" data-id="'+response[i]['id']+'" /> <input type="button" class="delete" value="Delete" data-id="'+response[i]['id']+'" />');
+						self.$el.find('#container-read').append(html);
 					}
 				}
 			});
-	    }
+		},
+		deleteForm: function(e){
+			e.preventDefault(); //Stop Target Event Object Do Something
+			this.model.set({zone:'delete'});
+			this.model.save({'id':e.currentTarget.getAttribute('data-id')});
+			this.render();
+		},
+		updateForm: function(e){
+			e.preventDefault(); //Stop Target Event Object Do Something
+			this.model.set({zone:'read', id:e.currentTarget.getAttribute('data-id')});
+			this.model.fetch({
+				success: function(collection, response){
+					$('#nickname').val(response[0]['nickname']);
+					$('#age').val(response[0]['age']);
+				}
+			});
+		},
+		submitForm: function(e){
+			e.preventDefault(); //Stop Target Event Object Do Something
+			var data=this.$el.find('form').serializeObject();
+			this.model.set({zone:'create'});
+			this.model.save(data);
+			this.render();
+			return false;
+    	}
 	});
-	var students=new Students, view=new View({model: students});
+	var students=new Student, view=new View({model: students});
 	})(jQuery);
    </script>
 </body>

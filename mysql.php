@@ -6,7 +6,7 @@ $mysqlDB='school';
 if(isset($_GET['zone'])){
 	$conID=mysql_pconnect($mysqlHost, $mysqlUser, $mysqlPass)or die('Error: '.mysql_error().'<br />');
 	@mysql_select_db($mysqlDB, $conID);
-	if($_GET['zone'] == 'create'){
+	if($_GET['zone'] == 'createDatabase'){
 		@mysql_query('Set names=utf8')or die('Error: '.mysql_error().'<br />');
 		@mysql_query('Set character_set_client=utf8')or die('Error: '.mysql_error().'<br />');
 		@mysql_query('Set character_set_results=utf8')or die('Error: '.mysql_error().'<br />');
@@ -36,27 +36,40 @@ if(isset($_GET['zone'])){
 		while(list($id, $nickname, $age)=@mysql_fetch_row($result)){
 			echo $nickname.'<br />';
 		}
-	} else if($_GET['zone'] == 'json'){
-		$result=mysql_query("Select * From student", $conID)or die('Error: '.mysql_error().'<br />');
+	} else if($_GET['zone'] == 'read'){
+		if(isset($_GET['id'])){
+			$result=mysql_query("Select * From student Where id=".$_GET['id'], $conID)or die('Error: '.mysql_error().'<br />');			
+		}
+		else{
+			$result=mysql_query("Select * From student", $conID)or die('Error: '.mysql_error().'<br />');
+		}
 		while($row=@mysql_fetch_assoc($result)){
 			$rows[]=$row;
 		}
 		header('Content-Type: application/json; charset=utf-8'); 
 		echo json_encode($rows);
-	} else if($_GET['zone'] == 'add'){
+	} else if($_GET['zone'] == 'create'){
 		$data=json_decode(file_get_contents('php://input'));
-		$query='Insert Into student(id, nickname, age) Values ('.$data->{'id'}.', "'.$data->{'nickname'}.'", '.$data->{'age'}.');';
+		$query="Select Max(id) as newId From student";
+		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
+		$rows=@mysql_fetch_row($result);
+		$newId=$rows[0]+1;
+		$query='Insert Into student(id, nickname, age) Values ('.$newId.', "'.$data->{'nickname'}.'", '.$data->{'age'}.');';
+		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
+	} else if($_GET['zone'] == 'update'){
+		$data=json_decode(file_get_contents('php://input'));
+		$query='Update student SET nickname="'.$data->{'nickname'}.'", age="'.$data->{'age'}.'" Where id='.$data->{'id'};
+		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
+	} else if($_GET['zone'] == 'delete'){
+		$data=json_decode(file_get_contents('php://input'));
+		$query='Delete From student Where id='.$data->{'id'};
 		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
 	}
-
-
-
-
 } else{
 	header('Content-Type:text/html; charset=utf-8');
 	echo'
 	<ol>
-		<li><a href="mysql.php?zone=create">Create Database</a></li>
+		<li><a href="mysql.php?zone=createDatabase">Create Database</a></li>
 		<li><a href="mysql.php?zone=view">View Data</a></li></li>
 		<li><a href="mysql.php?zone=json">View JSON</a></li>
 	</ol>
