@@ -41,45 +41,58 @@
 	Student.Model=Backbone.Model.extend({});
 	Student.Collection=Backbone.Collection.extend({
 		model: Student.Model,
-		url: 'mysql.php?zone=read',
-		initialize: function(){
-			console.log('Collection')
+		query: '?zone=read',
+		url: 'mysql.php',
+		initialize: function(arr, query){
+			this.query=query;
+			console.log('Collection'+this.query);
+		},
+		comparator: function(model){
+			return model.get();
 		}
 	});
 	Student.View=Backbone.View.extend({
 		el: $('#container-read'),
 		initialize: function(){
-			console.log('View');
-        	this.collection.bind('reset', this.render, this);
+			this.collection.bind('reset', this.render, this);
 		},
+		template: 'item.html',
 		html:'underfind',
 		render: function(){
+			this.read();
+		},
+		read: function(){
 			var self=this;
-			console.log(this.collection.length)
-			this.collection.each(
-				function(model){
-					self.el.load('item.html', function(html){
-						self.el.html(_.template(html, model.toJSON()));
-					});
-				}
-			);
+			self.el.load(this.template, function(html){
+				self.el.html('');
+				self.collection.each(
+					function(model){
+						self.el.html(_.template(html, model.toJSON())+self.el.html());
+					}
+				);
+			});
 		}
 	});
 	Student.Router=Backbone.Router.extend({
 		routes: {
-			'': 'defaultRoute'
+			'': 'defaultRoute',
+			':key/:value': 'getRead'
 		},
 		defaultRoute: function(){
-			console.log('defaultRoute');
 			var collection=new Student.Collection();
 			new Student.View({collection: collection});
 			collection.fetch();
-       		console.log(collection.length)
+		},
+		getRead: function(key, value){
+			var collection=new Student.Collection({},{id: value});
+			new Student.View({collection: collection});
+			collection.fetch();
 		}
 	})
 	var appRouter=new Student.Router();
 	Backbone.history.start();
 	})(jQuery);
-   </script>
+   </script> 
 </body>
 </html>
+ 
