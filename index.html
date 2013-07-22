@@ -2,25 +2,23 @@
 <html>
 <head>
 	<title>Hello World</title>
-	
-	<style>
-	#template{
-			display: none;
-	}
-	</style>
 </head>
 <body>
-	<h1>Hello World</h1>
+	<h1>Hello World CRUD</h1>
 	<div id='wrapper'>
-	<input type='button' class='readView' value='Read' /> <input type='button' class='createView' value='Create' />
-	<h2>View Data</h2>
+	<input type='button' class='mainView' value='Main' /> <input type='button' class='createView' value='Create' /> <input type='button' class='save' value='Save' />
+	<h2>Container</h2>
 	<div id='container'></div>
+	<div id='page-wrapper'>
+		<h2>Page</h2>
+		<div id='page-container'></div>
+	</div>
 	</div>
 	<script src='js/jquery.js'></script>
 	<script src='js/underscore-min.js'></script>
 	<script src='js/backbone.js'></script>
 	<script>
-
+	(function($){
 	var getQuery=function(query){
 		var queryStr='';
 		for(var i in query){
@@ -29,8 +27,7 @@
 			queryStr+=i+'='+query[i];
 		}
 		return queryStr;
-	};	
-	(function($){
+	};		
 	jQuery.fn.serializeObject=function() {
 		var arrayData, objectData;
 		arrayData=this.serializeArray();
@@ -56,8 +53,8 @@
 	var Student={};
 	Student.View={};
 	Student.Model=Backbone.Model.extend({
-		initialize: function(){
-
+		initialize: function(collection, query){
+			console.log('Model Initialize');
 		},
 		defaults: {
 			'id': 'underfind',
@@ -65,136 +62,170 @@
 		},
 		urlRoot: 'mysql.php',
 		url: function(){
-			queryStr=getQuery(this.query);
-			var base=this.urlRoot || (this.collection && this.collection.url) || '/';
+			var base=this.urlRoot || (this.collection && this.collection.url) || '/', query=getQuery(this.query)
 			if (this.isNew()) return base;
-			console.log('act: '+base+'?'+queryStr);
-			return base+'?'+queryStr;
+			return base+'?'+query;
 		}
 	});
 	Student.Collection=Backbone.Collection.extend({
-		model: Student.Model,
-		initialize: function(arr, query){
-			this.query=query;
-			console.log('Collection');
+		initialize: function(){
+			console.log('Collection Initialize');
 		},
+		model: Student.Model,
 		comparator: function(model){
 			return model.get();
 		}
 	});
-	Student.View.Create=Backbone.View.extend({
-		el: $('#wrapper'),
-		template: 'create.html',
-		events: {
-			"click .createView": "view",
-			"click .submit": "submit"
-		},	
-		view: function(e){
-			console.log('show');
-			$('#container').load(this.template);
-		},	
-		submit: function(e){
-			console.log('Submit');
-			e.preventDefault();
-			var data=this.$el.find('form').serializeObject();
-			this.model.query={'act':'create'}
-			this.model.save(data);
-			return false;
-		}
-	});	
-	Student.View.Update=Backbone.View.extend({
-		el: $('#wrapper'),
-		container: $('#container'),
-		template: 'update.html',
-		events: {
-			"click .updateView": "view",
-			"click .updateSubmit": "submit"
-		},
-		view: function(e){
-			console.log('---------- Student.View Update ----------');
-			console.log('View');
-			var self=this;
-			this.container.load(this.template, function(html){
-				self.container.html('');
-				self.container.html(_.template(html, self.model.toJSON())+self.container.html());
-			});
-			return false;
-		},	
-		submit: function(e){
-			console.log('Submit');
-			e.preventDefault();
-			var data=this.$el.find('form').serializeObject();
-			this.model.query={'act':'update'}	
-			this.model.save(data);
-			return false;
-		}
-	});	
 	Student.View.Read=Backbone.View.extend({
 		el: $('#wrapper'),
 		container: $('#container'),
-		collection: new Student.Collection(),
-		template: 'item.html',
+		template: 'main.html',
+		templateRead: 'read.html',
 		templateUpdate: 'update.html',
-		query: {'act':'read'},
+		templateCreate: 'create.html',
+		query: {'act': 'read'},
+		page: {
+			el: $('#page-wrapper'),			
+			container: $('#page-container'),
+			template: 'page.html',
+			max: 5,
+			current: 1
+		},
+		history: [],
 		events: {
-			"click .readView": "render",
-			"click .updateView": "update",
-			"click .delete": "delete"
+			"click .save": "save",
+			"click .mainView": "render",
+			// Page //
+			"click .pageView": "render",
+			// Read //
+			"click .readView": "readView",
+			// Create //
+			"click .createView": "createView",
+			"click .createSubmit": "createSubmit",
+			// Update //
+			"click .updateView": "updateView",
+			"click .updateSubmit": "updateSubmit",
+			"click .deleteSubmit": "deleteSubmit"
 		},
 		initialize: function(collection, query){
-			console.log('---------- Student.View Read ----------');
-			console.log('Initialize');
-			var queryStr=getQuery(this.query);
-			console.log(queryStr);
-			this.collection.url='mysql.php?'+queryStr;
+			console.log('View- Initialize');
+			var that=this, query=getQuery(this.query);
+			this.collection.url='mysql.php?'+query;
+			that.collection.fetch({
+				success: function(collection, resp){
+					that.render();
+				}
+			});
+		},
+		render: function(evt){
+			console.log('View- Render');
+			this.page.current=evt?(evt.currentTarget.getAttribute('data-page')?evt.currentTarget.getAttribute('data-page'):1):1;
+			var that=this, pageStart=(that.page.current-1)*that.page.max, pageEnd=pageStart+that.page.max;
+			this.container.load(this.template, function(html){
+				that.container.html('');
+				for(var i=pageStart; i < pageEnd; i++){
+					if(!(that.collection).models[i]) break;
+					that.container.html(that.container.html()+_.template(html, (that.collection).models[i].toJSON()));
+				}
+			});
+			// Page //
+			var pageCounter=Math.ceil(((this.collection).models.length)/this.page.max);
+			console.log(pageCounter);
+			this.page.container.load(this.page.template, function(html){
+				that.page.container.html('');
+				for(var i=1; i <= pageCounter; i++){
+					that.page.container.html(that.page.container.html()+_.template(html, {page: i}));
+				}
+			});	
+			return false;		
+		},
+		createView: function(evt){
+			console.log('View- Create');
+			evt.preventDefault();
+			this.container.load(this.templateCreate);
+			return false;
+		},
+		createSubmit: function(evt){
+			console.log('View- Create- Submit');
+			evt.preventDefault();
+			var model=this.model, query={'act': 'create'}, data=this.$el.find('form').serializeObject();
+			// Request Client //
+			this.collection.add(data);
+			// Save History //
+			this.history.push({'model':model, 'query':query, 'data':data});	
+			// Request Server //			
+			//this.request(model, query, data);
 			this.render();
 		},
-		render: function(){
-			console.log('Render');
-			this.read();
-		},
-		delete: function(e){
-			var id=e.currentTarget.getAttribute('data-id');
-			var model=this.collection.get(id);
-			model.query={'act': 'delete'};
-			model.data={'id': id};
-   			model.save(model.query);
-		},
-		update: function(e){
-			console.log('Update');
-			var self=this, id=e.currentTarget.getAttribute('data-id'), model=self.collection.get(id);
-			this.container.load(this.templateUpdate, function(html){
-				self.container.html('');
-				self.container.html(_.template(html, model.toJSON())+self.container.html());
+		readView: function(evt){
+			console.log('View- Read');
+			evt.preventDefault();
+			var that=this, id=evt.currentTarget.getAttribute('data-id'), model=that.collection.get(id);
+			this.container.load(this.templateRead, function(html){
+				that.container.html('');
+				that.container.html(_.template(html, model.toJSON())+that.container.html());
 			});
 			return false;
 		},
-		read: function(){
-			console.log(this.container);
-			var self=this;
-			self.container.load(this.template, function(html){
-				self.container.html('');
-				self.collection.on("add change", 
-					function(model){
-						console.log('counter');
-						self.container.html(_.template(html, model.toJSON())+self.container.html());
-					}, this
-				);
-				self.collection.fetch();
+		updateView: function(evt){
+			console.log('View- Update');
+			evt.preventDefault();
+			var that=this, id=evt.currentTarget.getAttribute('data-id'), model=that.collection.get(id);
+			this.container.load(this.templateUpdate, function(html){
+				that.container.html('');
+				that.container.html(_.template(html, model.toJSON())+that.container.html());
 			});
+			return false;
+		},
+		updateSubmit: function(evt){
+			console.log('View- Update- Submit');
+			evt.preventDefault();
+			var query={'act':'update'}, data=this.$el.find('form').serializeObject(), model=this.collection.get(data.id);
+			console.log(model);
+			// Request Client //			
+			model.set(data);
+			// Save History //			
+			this.history.push({'model':model, 'query':query, 'data':data});	
+			// Request Server //			
+			//this.request(model, query, data);
+			this.render();
+		},
+		request: function(model, query, data){
+			console.log('View- Request');
+			console.dir(model);
+			this.model.query=query;
+			this.model.save(data);
+		},
+		save: function(){
+			console.log('View- Save');
+			for(var i in this.history){
+				console.dir(this.history[i]);
+				this.request(this.history[i].model, this.history[i].query, this.history[i].data);
+			}
+			this.initialize();
+		},	
+		deleteSubmit: function(evt){
+			console.log('View- Delete');
+			evt.preventDefault();
+			var id=evt.currentTarget.getAttribute('data-id'), model=this.collection.get(id), query={'act': 'delete'}, data={'id': id};
+			// Request Client //
+			model.destroy();
+			// Save History //
+			this.history.push({'model':model, 'query':query, 'data':data});		
+			// Request Server //			
+			//this.request(model, query, data);
+			this.render();
 		}
 	});
-
 	Student.Router=Backbone.Router.extend({
 		routes: {
 			'': 'default',
 			'act=:act/id=:id': 'default'
 		},
-		default: function(act, id){
+		'default': function(act, id){
 			var collection=new Student.Collection();
-			new Student.View.Read({collection: collection});
 			var model=new Student.Model();
-			new Student.View.Create({model: model});
+			new Student.View.Read({collection: collection, model: model});
 		}
 	})
 	var appRouter=new Student.Router();
