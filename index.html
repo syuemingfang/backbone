@@ -12,86 +12,195 @@
 <body>
 	<h1>Hello World</h1>
 	<div id='wrapper'>
-	<input type='button' id='readPage' value='Read' /> <input type='button' id='createPage' value='Create' />
+	<input type='button' class='readView' value='Read' /> <input type='button' class='createView' value='Create' />
 	<h2>View Data</h2>
-	<ul id='container-read'></ul>
-	</div>
-	<div id='template'>
-		<ul class='list-read'><li></li></ul>
-		<form id='form-create'>
-			<h2>Create Data</h2>
-			nickname: <input type='text' name='nickname' id='nickname' value='Joe' />
-			age: <input type='text' name='age' id='age' value='20' />
-			<input type='button' name='create' id='create' value='Create' />
-		</form>
-		<form id='form-update'>
-			<h2>Update Data</h2>
-			<input type='hidden' name='id' id='id' value='' />
-			nickname: <input type='text' name='nickname' id='nickname' value='Joe' />
-			age: <input type='text' name='age' id='age' value='20' />
-			<input type='button' name='update' id='update' value='Update' />
-		</form>
+	<div id='container'></div>
 	</div>
 	<script src='js/jquery.js'></script>
 	<script src='js/underscore-min.js'></script>
 	<script src='js/backbone.js'></script>
 	<script>
+
+	var getQuery=function(query){
+		var queryStr='';
+		for(var i in query){
+			if(typeof query[i] == 'undefined') continue;
+			if(queryStr !== '') queryStr+='&';
+			queryStr+=i+'='+query[i];
+		}
+		return queryStr;
+	};	
 	(function($){
+	jQuery.fn.serializeObject=function() {
+		var arrayData, objectData;
+		arrayData=this.serializeArray();
+		objectData={};
+		$.each(arrayData, function(){
+			var value;
+			if(this.value != null){
+				value=this.value;
+			} else{
+				value='';
+			}
+			if(objectData[this.name] != null) {
+				if(!objectData[this.name].push) {
+					objectData[this.name]=[objectData[this.name]];
+				}
+				objectData[this.name].push(value);
+			} else {
+				objectData[this.name]=value;
+			}
+		});
+		return objectData;
+	};	
 	var Student={};
-	Student.Model=Backbone.Model.extend({});
+	Student.View={};
+	Student.Model=Backbone.Model.extend({
+		initialize: function(){
+
+		},
+		defaults: {
+			'id': 'underfind',
+			'nickname': 'underfind'
+		},
+		urlRoot: 'mysql.php',
+		url: function(){
+			queryStr=getQuery(this.query);
+			var base=this.urlRoot || (this.collection && this.collection.url) || '/';
+			if (this.isNew()) return base;
+			console.log('act: '+base+'?'+queryStr);
+			return base+'?'+queryStr;
+		}
+	});
 	Student.Collection=Backbone.Collection.extend({
 		model: Student.Model,
-		query: '?zone=read',
-		url: 'mysql.php',
 		initialize: function(arr, query){
 			this.query=query;
-			console.log('Collection'+this.query);
+			console.log('Collection');
 		},
 		comparator: function(model){
 			return model.get();
 		}
 	});
-	Student.View=Backbone.View.extend({
-		el: $('#container-read'),
-		initialize: function(){
-			this.collection.bind('reset', this.render, this);
+	Student.View.Create=Backbone.View.extend({
+		el: $('#wrapper'),
+		template: 'create.html',
+		events: {
+			"click .createView": "view",
+			"click .submit": "submit"
+		},	
+		view: function(e){
+			console.log('show');
+			$('#container').load(this.template);
+		},	
+		submit: function(e){
+			console.log('Submit');
+			e.preventDefault();
+			var data=this.$el.find('form').serializeObject();
+			this.model.query={'act':'create'}
+			this.model.save(data);
+			return false;
+		}
+	});	
+	Student.View.Update=Backbone.View.extend({
+		el: $('#wrapper'),
+		container: $('#container'),
+		template: 'update.html',
+		events: {
+			"click .updateView": "view",
+			"click .updateSubmit": "submit"
 		},
+		view: function(e){
+			console.log('---------- Student.View Update ----------');
+			console.log('View');
+			var self=this;
+			this.container.load(this.template, function(html){
+				self.container.html('');
+				self.container.html(_.template(html, self.model.toJSON())+self.container.html());
+			});
+			return false;
+		},	
+		submit: function(e){
+			console.log('Submit');
+			e.preventDefault();
+			var data=this.$el.find('form').serializeObject();
+			this.model.query={'act':'update'}	
+			this.model.save(data);
+			return false;
+		}
+	});	
+	Student.View.Read=Backbone.View.extend({
+		el: $('#wrapper'),
+		container: $('#container'),
+		collection: new Student.Collection(),
 		template: 'item.html',
-		html:'underfind',
+		templateUpdate: 'update.html',
+		query: {'act':'read'},
+		events: {
+			"click .readView": "render",
+			"click .updateView": "update",
+			"click .delete": "delete"
+		},
+		initialize: function(collection, query){
+			console.log('---------- Student.View Read ----------');
+			console.log('Initialize');
+			var queryStr=getQuery(this.query);
+			console.log(queryStr);
+			this.collection.url='mysql.php?'+queryStr;
+			this.render();
+		},
 		render: function(){
+			console.log('Render');
 			this.read();
 		},
+		delete: function(e){
+			var id=e.currentTarget.getAttribute('data-id');
+			var model=this.collection.get(id);
+			model.query={'act': 'delete'};
+			model.data={'id': id};
+   			model.save(model.query);
+		},
+		update: function(e){
+			console.log('Update');
+			var self=this, id=e.currentTarget.getAttribute('data-id'), model=self.collection.get(id);
+			this.container.load(this.templateUpdate, function(html){
+				self.container.html('');
+				self.container.html(_.template(html, model.toJSON())+self.container.html());
+			});
+			return false;
+		},
 		read: function(){
+			console.log(this.container);
 			var self=this;
-			self.el.load(this.template, function(html){
-				self.el.html('');
-				self.collection.each(
+			self.container.load(this.template, function(html){
+				self.container.html('');
+				self.collection.on("add change", 
 					function(model){
-						self.el.html(_.template(html, model.toJSON())+self.el.html());
-					}
+						console.log('counter');
+						self.container.html(_.template(html, model.toJSON())+self.container.html());
+					}, this
 				);
+				self.collection.fetch();
 			});
 		}
 	});
+
 	Student.Router=Backbone.Router.extend({
 		routes: {
-			'': 'defaultRoute',
-			':key/:value': 'getRead'
+			'': 'default',
+			'act=:act/id=:id': 'default'
 		},
-		defaultRoute: function(){
+		default: function(act, id){
 			var collection=new Student.Collection();
-			new Student.View({collection: collection});
-			collection.fetch();
-		},
-		getRead: function(key, value){
-			var collection=new Student.Collection({},{id: value});
-			new Student.View({collection: collection});
-			collection.fetch();
+			new Student.View.Read({collection: collection});
+			var model=new Student.Model();
+			new Student.View.Create({model: model});
 		}
 	})
 	var appRouter=new Student.Router();
 	Backbone.history.start();
 	})(jQuery);
+
    </script> 
 </body>
 </html>

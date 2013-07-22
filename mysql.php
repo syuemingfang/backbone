@@ -3,10 +3,10 @@ $mysqlHost='127.0.0.1';
 $mysqlUser='root';
 $mysqlPass='';
 $mysqlDB='school';
-if(isset($_GET['zone'])){
+if(isset($_GET['act'])){
 	$conID=mysql_pconnect($mysqlHost, $mysqlUser, $mysqlPass)or die('Error: '.mysql_error().'<br />');
 	@mysql_select_db($mysqlDB, $conID);
-	if($_GET['zone'] == 'createDatabase'){
+	if($_GET['act'] == 'createDatabase'){
 		@mysql_query('Set names=utf8')or die('Error: '.mysql_error().'<br />');
 		@mysql_query('Set character_set_client=utf8')or die('Error: '.mysql_error().'<br />');
 		@mysql_query('Set character_set_results=utf8')or die('Error: '.mysql_error().'<br />');
@@ -31,12 +31,12 @@ if(isset($_GET['zone'])){
 			echo 'Okay: '.$query.'<br />';
 		}
 		echo 'MySQL quite ready now.<br />';
-	} else if($_GET['zone'] == 'view'){
+	} else if($_GET['act'] == 'view'){
 		$result=mysql_query("Select * From student", $conID)or die('Error: '.mysql_error().'<br />');
 		while(list($id, $nickname, $age)=@mysql_fetch_row($result)){
 			echo $nickname.'<br />';
 		}
-	} else if($_GET['zone'] == 'read'){
+	} else if($_GET['act'] == 'read'){
 		if(isset($_GET['id'])){
 			$result=mysql_query("Select * From student Where id=".$_GET['id'], $conID)or die('Error: '.mysql_error().'<br />');			
 		}
@@ -48,19 +48,19 @@ if(isset($_GET['zone'])){
 		}
 		header('Content-Type: application/json; charset=utf-8'); 
 		echo json_encode($rows);
-	} else if($_GET['zone'] == 'create'){
+	} else if($_GET['act'] == 'create'){
 		$data=json_decode(file_get_contents('php://input'));
 		$query="Select Max(id) as newId From student";
 		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
 		$rows=@mysql_fetch_row($result);
 		$newId=$rows[0]+1;
-		$query='Insert Into student(id, nickname, age) Values ('.$newId.', "'.$data->{'nickname'}.'", '.$data->{'age'}.');';
+		$query='Insert Into student(id, nickname) Values ('.$newId.', "'.$data->{'nickname'}.'");';
 		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
-	} else if($_GET['zone'] == 'update'){
+	} else if($_GET['act'] == 'update'){
 		$data=json_decode(file_get_contents('php://input'));
 		$query='Update student SET nickname="'.$data->{'nickname'}.'", age="'.$data->{'age'}.'" Where id='.$data->{'id'};
 		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
-	} else if($_GET['zone'] == 'delete'){
+	} else if($_GET['act'] == 'delete'){
 		$data=json_decode(file_get_contents('php://input'));
 		$query='Delete From student Where id='.$data->{'id'};
 		$result=@mysql_query($query, $conID)or die('Error: '.$query.'<br />');
@@ -69,9 +69,9 @@ if(isset($_GET['zone'])){
 	header('Content-Type:text/html; charset=utf-8');
 	echo'
 	<ol>
-		<li><a href="mysql.php?zone=createDatabase">Create Database</a></li>
-		<li><a href="mysql.php?zone=view">View Data</a></li></li>
-		<li><a href="mysql.php?zone=json">View JSON</a></li>
+		<li><a href="mysql.php?act=createDatabase">Create Database</a></li>
+		<li><a href="mysql.php?act=view">View Data</a></li></li>
+		<li><a href="mysql.php?act=json">View JSON</a></li>
 	</ol>
 	';
 }
